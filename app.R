@@ -76,7 +76,7 @@ Shiny.onInputChange("jscookie", "");
 ###########  UI   ########################
 ui <- dashboardPage(
 
-  dashboardHeader(title = "miSensors" , titleWidth = 150 ),
+  dashboardHeader(title = "miSensors" , titleWidth = 120 ),
   
 ####    Dashboard  Sidebar  ####
    
