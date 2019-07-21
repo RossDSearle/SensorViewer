@@ -23,7 +23,18 @@ library(fullcalendar)
 library(leaflet.extras)
 library(rhandsontable)
 
-setwd('/srv/shiny-server/SensorViewer')
+debugging = T
+
+machineName <- as.character(Sys.info()['nodename'])
+print(machineName)
+if(machineName == 'FANCY-DP'){
+  rootDir <<- 'C:/Users/sea084/Dropbox/RossRCode/Git/Shiny/SensorViewer'
+}else{
+  rootDir <- '/srv/shiny-server/SensorViewer'
+}
+
+
+setwd(rootDir)
 #print("This is me here")
  source('appUtils.R')
  source('appConfig.R')
@@ -76,11 +87,57 @@ Shiny.onInputChange("jscookie", "");
 ###########  UI   ########################
 ui <- dashboardPage(
 
-  dashboardHeader(title = "miSensors" , titleWidth = 120 ),
+  dashboardHeader(title = "     miSensors" , titleWidth = 200 ),
+  #dashboardHeader( disable = TRUE ),
+ 
   
 ####    Dashboard  Sidebar  ####
    
   dashboardSidebar(
+    
+    tags$li(
+      #class = "dropdown",
+      
+
+      tags$style(".navbar-static-top{ max-width:200; position: fixed; top: 0px; left: 0px; text-align:left}"),
+      tags$style(".sidebar-toggle{position: fixed; top: 0px; left: 0px;  min-width:40px;max-width:40px; z-index:100; color:red; }"),
+      #tags$style(".logo{position:relative;   min-width:1000px; z-index:1001; float:left;  }")
+      
+      tags$style(".logo{position:relative; top: 0px; left: 40px;  min-width:1200px; max-width:800px; z-index:1000; text-align:left}"),
+      
+      #tags$style(".logo{position: relative;, width:1000px; z-index:100000; }")
+      
+  #     tags$style(
+  #     " .main-header{ position: fixed;
+  #     background-color:blue;
+  #  top: 0px;
+  #  left: 0px;
+  # width:1000px;
+  #     }"
+  #     ),
+      
+ 
+ # tags$style(".skin-blue .sidebar-collapse{ background-color:green;}"),
+ 
+  tags$style(".main-header .logo{text-align:left;}"),
+  #     tags$style(".navbar-custom-menu{
+  #      background-color:red;
+  #      max-width:20;
+  #      position: fixed;
+  # top: 0px;
+  # left: 0px;
+  # 
+  #     }"),
+
+      tags$style(
+        ".skin-blue .main-header .navbar{
+        background-color:green;
+      text-align:left;
+      max-width:0;
+      #z-index:-1;
+        }  "
+        )
+    ),
     
     tags$head(tags$script(HTML("
       Shiny.addCustomMessageHandler('manipulateMenuItem', function(message){
@@ -396,7 +453,9 @@ server <- function(input, output, session) {
     
     dtype <- input$DataTypeDataDownload
     locID <- input$SelectedSiteDataDownload
-    
+
+    if(!debugging){
+        
     if(has_internet()){
      if(dtype != 'None' & locID != 'None' & locID != ''  & dtype != ''){
 
@@ -410,7 +469,7 @@ server <- function(input, output, session) {
 
     
     url <- paste0(senFedPath, "getSensorDataStreams?siteid=", sensorID,"&sensortype=", dtype,"&startdate=", isoSDate, '&enddate=', isoEDate, "&aggperiod=days&usr=SensorViewer&pwd=UbB0f7jXKQBXahyfU7cjOcaZEHUZSpE19dmX")
-    
+
     resp <- getURL(paste0(url))
     if(responseIsOK(resp)){
       ts <- convertJSONtoTS(resp)
@@ -451,6 +510,7 @@ server <- function(input, output, session) {
       session$sendCustomMessage(type = 'errorMessage', message = paste0('There was a problem connecting to the internet'))
     }
     
+    }
     })
   })
 
@@ -575,6 +635,8 @@ server <- function(input, output, session) {
     
     req(input$DataTypeDataDownload)
     
+    if(!debugging){
+    
     d <- getURL(paste0(senFedPath,"getSensorLocations?sensortype=", input$DataTypeDataDownload))
     sdf <- fromJSON(d)
 
@@ -609,6 +671,8 @@ server <- function(input, output, session) {
                                   group = "Sensors" )
     proxy %>% setView(lng = center()[1],lat = center()[2],zoom = zoom())
     proxy %>% leaflet::addLegend("bottomleft", pal = factpal, values = colCats,title = input$SensorLabel)
+    
+    }
   })
   
   center <- reactive({
@@ -856,16 +920,19 @@ server <- function(input, output, session) {
   })
 
   observe({
-    if(appAuth$loggedIn){
-      
-      req(input$pickSensor)
-        sensorID <- getSensorIDFronLocalName(con, appAuth$currentUsr, input$pickSensor)
-        url <- paste0(senFedPath,'getSensorInfo?siteid=', sensorID)
-        stnsRaw <- getURL(paste0(url))
-        stnsJ <- fromJSON(stnsRaw)
-        sns <- unique(stnsJ$DataType)
-        updateSelectInput(session, "pickDataStreamType", choices =  sns, selected = DefaultSensor)
+    if(!debugging){
+    
+      if(appAuth$loggedIn){
+        
+        req(input$pickSensor)
+          sensorID <- getSensorIDFronLocalName(con, appAuth$currentUsr, input$pickSensor)
+          url <- paste0(senFedPath,'getSensorInfo?siteid=', sensorID)
+          stnsRaw <- getURL(paste0(url))
+          stnsJ <- fromJSON(stnsRaw)
+          sns <- unique(stnsJ$DataType)
+          updateSelectInput(session, "pickDataStreamType", choices =  sns, selected = DefaultSensor)
       }
+    }
   })
   
   
@@ -875,6 +942,8 @@ server <- function(input, output, session) {
   observe({
     
     withBusyIndicatorServer("fetchSensorData", {
+      
+      if(!debugging){
 
     dtype <- input$pickDataStreamType
     locID <- input$pickSensor
@@ -926,7 +995,10 @@ print(url)
       session$sendCustomMessage(type = 'errorMessage', message = paste0('There was a problem connecting to the internet'))
       
     }
+      }
   })
+    
+    
 })
 
 
