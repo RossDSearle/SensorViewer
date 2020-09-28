@@ -187,7 +187,13 @@ shiny::shinyApp(
                         
                         f7Picker(inputId = 'pickSensor', label = "Site Name",  choices =  c('None'), toolbar=T, openIn='auto',scrollToInput=T,toolbarCloseText = "Done",sheetSwipeToClose = TRUE),
                         f7Picker(inputId = 'pickDataStreamType', label = "Sensor Type",  choices =  c('None'), toolbar=T, openIn='auto',scrollToInput=T,toolbarCloseText = "Done",sheetSwipeToClose = TRUE),
-                        
+                        pickerInput(
+                          inputId = 'pickSensor',
+                          label = "LOcation", 
+                          choices = c('None'),
+                          options = list('mobile' = TRUE, 'inline'=T, size = 5)
+                          
+                        ),
                         #selectInput("pickDataStreamType", "Sensor Type", list(c('None'))), 
                         
                         
@@ -378,6 +384,80 @@ shiny::shinyApp(
     RV$Init <- T
     
     
+    
+    
+    
+    
+    ####   Get data from a sensor ######
+    
+    observe({
+      
+      withBusyIndicatorServer("fetchSensorData", {
+        
+        if(!debugging){
+          
+          dtype <- input$pickDataStreamType
+          locID <- input$pickSensor
+          
+          if(has_internet()){
+            if(dtype != 'None' & locID != 'None' & locID != ''  & dtype != ''){
+              
+              tryCatch({
+                
+                dnowYMD <- format(Sys.time(), "%Y-%m-%d")
+                isoEDate <- paste0(format(Sys.time(), "%Y-%m-%d"), 'T00:00:00')
+                
+                edp <- strptime(isoEDate, "%Y-%m-%dT%H:%M:%S")
+                back <- (60 * 60 * 24 * RV$pref_daysSince) + 1
+                py <- edp - back
+                isoSDate <- str_replace_all(as.character(py), ' ', 'T')
+                
+                sensorID <- getSensorIDFromLocalName(con, appAuth$currentUsr, input$pickSensor)
+                
+                url <- paste0(senFedPath, "getSensorDataStreams?siteid=", sensorID,"&sensortype=", dtype,"&startdate=", isoSDate, '&enddate=', isoEDate, "&aggperiod=days&usr=SensorViewer&pwd=UbB0f7jXKQBXahyfU7cjOcaZEHUZSpE19dmX")
+                print(url)
+                resp <- getURL(paste0(url))
+                if(responseIsOK(resp)){
+                  ts <- convertJSONtoTS(resp)
+                  if(is.null(colnames(ts))){
+                    colnames(ts) <- c( dtype)
+                  }
+                  if(nrow(ts) > 0){
+                    appData$currentTS <- ts
+                    RV$error <- ''
+                  }
+                }else{
+                  e <- fromJSON(resp)
+                  stop(e$error)
+                }
+                
+              }, error = function(err) {
+                #shinyalert("Oops", err$message, type = 'error')
+                
+                RV$error <- 'It would appear there is no data to display for this sensor.'
+                
+                
+              },finally = {
+                
+              })
+            }
+          }else{
+            
+            session$sendCustomMessage(type = 'errorMessage', message = paste0('There was a problem connecting to the internet'))
+            
+          }
+        }
+      })
+      
+      
+    })
+    
+    
+    
+    
+    
+    
+    
 ######   Update pick lists   ###########    
     
     observe({
@@ -385,7 +465,9 @@ shiny::shinyApp(
       if(appAuth$loggedIn){
         sql <- paste0("select * from appUserLocations where usr = '", str_to_lower(appAuth$currentUsr), "'")
         sns <- queryDB(sql)
-        updateF7Picker( inputId = 'pickSensor', choices = sns$localName, value = sns$localName[1] )
+        print(head(sns))
+       # updateF7Picker( inputId = 'pickSensor', choices = sns$localName, value = sns$localName[1] )
+        updatePickerInput(session=session, inputId = 'pickSensor', choices = sns$localName, selected = sns$localName[1] )
       }
     })
     
@@ -395,11 +477,11 @@ shiny::shinyApp(
       req(input$pickSensor,appAuth$loggedIn)
      # print('KKKKKKKKKKKKKKKKKKKKKKKK')
       sensorID <- getSensorIDFromLocalName(appAuth$currentUsr, input$pickSensor)
-      print(sensorID)
+
       url <- paste0(senFedPath,'getSensorInfo?siteid=', sensorID)
       print(url)
       stnsJ <- getWebDataDF(url)
-      print(stnsJ)
+
       # stnsRaw <- getURL(paste0(url))
       # stnsJ <- fromJSON(stnsRaw)
        sns <- unique(stnsJ$DataType)
@@ -438,22 +520,6 @@ shiny::shinyApp(
     })
     
     
-    
-    # js$getcookie()
-    # 
-    # 
-    # # addClass(selector = "body", class = "sidebar-collapse")
-    # 
-    # observeEvent(input$mysidebar,
-    #              {
-    #                
-    #                if( RV$AppType == 'mobile'){
-    #                  # for desktop browsers
-    #                  addClass(selector = "body", class = "sidebar-collapse")
-    #                  # for mobile browsers
-    #                  removeClass(selector = "body", class = "sidebar-open")
-    #                }
-    #              })
     
     # check if a cookie is present 
     observe({
