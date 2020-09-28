@@ -1,6 +1,28 @@
-
 library(jsonlite)
 library(curl)
+library(httr)
+
+getWebDataJSON <- function(url){
+  resp <- GET(url, timeout = 300)
+  response <- content(resp, "text", encoding = 'UTF-8')
+  return(response)
+}
+
+getWebDataDF <- function(json){
+  md <- fromJSON(json)
+  return(md)
+}
+
+queryDB <- function(sql){
+  con <- dbConnect(RSQLite::SQLite(), dbPath, flags = SQLITE_RO)
+  res <- dbSendQuery(con, sql)
+  sns <- dbFetch(res)
+  dbClearResult(res)
+  dbDisconnect(con)
+  return(sns)
+  
+}
+
 
 
 getListofUserSensors <- function(con, usr){
@@ -15,11 +37,12 @@ getListofUserSensors <- function(con, usr){
   
 }
 
-getSensorIDFronLocalName <- function(con, usr, sensorName){
+getSensorIDFromLocalName <- function(usr, sensorName){
   sql <- paste0("select * from appUserLocations where usr = '", str_to_lower(usr), "' and localName = '", sensorName, "'")
-  res <- dbSendQuery(con, sql)
-  sns <- dbFetch(res)
-  dbClearResult(res)
+  sns <- queryDB(sql)
+  #  res <- dbSendQuery(con, sql)
+  # sns <- dbFetch(res)
+  # dbClearResult(res)
   return(sensorID <- sns$locationID[1])
 }
 

@@ -33,6 +33,8 @@ library(rAmCharts)
 
 
 
+
+
 defWidth = '380px'
 loaderTime = 0
 cookieName = 'miSensorsAppInfo'
@@ -55,7 +57,7 @@ source('appUtils.R')
 source('appConfig.R')
 source("helpers.R")
 
-con <- dbConnect(RSQLite::SQLite(), dbPath, flags = SQLITE_RO)
+
 
 
 isValidEmail <- function(x) {
@@ -184,7 +186,9 @@ shiny::shinyApp(
                         #fluidRow(column(1), column(11,selectInput("pickSensor", "Site Name", list(c('None'))))),
                         
                         f7Picker(inputId = 'pickSensor', label = "Site Name",  choices =  c('None'), toolbar=T, openIn='auto',scrollToInput=T,toolbarCloseText = "Done",sheetSwipeToClose = TRUE),
-                        selectInput("pickDataStreamType", "Sensor Type", list(c('None'))), 
+                        f7Picker(inputId = 'pickDataStreamType', label = "Sensor Type",  choices =  c('None'), toolbar=T, openIn='auto',scrollToInput=T,toolbarCloseText = "Done",sheetSwipeToClose = TRUE),
+                        
+                        #selectInput("pickDataStreamType", "Sensor Type", list(c('None'))), 
                         
                         
                         
@@ -362,11 +366,8 @@ shiny::shinyApp(
     
     d <- getURL(paste0(senFedPath,"getSensorLocations"))
     sensorLocs <- fromJSON(d)
-    # print(sensorLocs)
-    
     RV <- reactiveValues()
     RV$SelectedSite <- NULL
-    #  RV$CurrentUser <- NULL
     RV$sensorLocs <- sensorLocs
     RV$sensorLocsDownload <- NULL
     RV$pref_defSite <- NULL
@@ -374,44 +375,50 @@ shiny::shinyApp(
     RV$error <- NULL
     RV$AppType <- NULL
     RV$CurrentSensorData <- NULL
-    #   RV$pwd <- NULL
     RV$Init <- T
     
     
-    
+######   Update pick lists   ###########    
     
     observe({
       
-      print(appAuth$loggedIn)
       if(appAuth$loggedIn){
         sql <- paste0("select * from appUserLocations where usr = '", str_to_lower(appAuth$currentUsr), "'")
-        res <- dbSendQuery(con, sql)
-        sns <- dbFetch(res)
-        dbClearResult(res)
-        print(sns)
-        str(sns$localName)
-        #updateSelectInput(session, "pickSensor", choices =  sns$locationID)
+        sns <- queryDB(sql)
         updateF7Picker( inputId = 'pickSensor', choices = sns$localName, value = sns$localName[1] )
-        
-        updateF7Select( inputId = 'pickDataStreamType') 
       }
     })
     
     
     observe({
-      if(!debugging){
+     
+      req(input$pickSensor,appAuth$loggedIn)
+     # print('KKKKKKKKKKKKKKKKKKKKKKKK')
+      sensorID <- getSensorIDFromLocalName(appAuth$currentUsr, input$pickSensor)
+      print(sensorID)
+      url <- paste0(senFedPath,'getSensorInfo?siteid=', sensorID)
+      print(url)
+      stnsJ <- getWebDataDF(url)
+      print(stnsJ)
+      # stnsRaw <- getURL(paste0(url))
+      # stnsJ <- fromJSON(stnsRaw)
+       sns <- unique(stnsJ$DataType)
+       #print(sns)
+
+      #if(debugging){
         
-        if(appAuth$loggedIn){
+        #if(appAuth$loggedIn){
           
-          req(input$pickSensor)
-          sensorID <- getSensorIDFronLocalName(con, appAuth$currentUsr, input$pickSensor)
-          url <- paste0(senFedPath,'getSensorInfo?siteid=', sensorID)
-          stnsRaw <- getURL(paste0(url))
-          stnsJ <- fromJSON(stnsRaw)
-          sns <- unique(stnsJ$DataType)
-          updateSelectInput(session, "pickDataStreamType", choices =  sns, selected = DefaultSensor)
-        }
-      }
+          # req(input$pickSensor)
+          # sensorID <- getSensorIDFronLocalName(con, appAuth$currentUsr, input$pickSensor)
+          # url <- paste0(senFedPath,'getSensorInfo?siteid=', sensorID)
+          # stnsRaw <- getURL(paste0(url))
+          # stnsJ <- fromJSON(stnsRaw)
+          # sns <- unique(stnsJ$DataType)
+          #updateSelectInput(session, "pickDataStreamType", choices =  sns, selected = DefaultSensor)
+          updateF7Picker( inputId = 'pickDataStreamType', choices = sns, value = sns[1] )
+       # }
+      #}
     })
     
     
@@ -453,14 +460,12 @@ shiny::shinyApp(
       
       
       if(RV$Init){
-        print('Cookiestuff')
+
         r<-remove_cookie('miSensorsAppInfo')
-        # print(r)
+
         add_cookie(name=cookieName, value='ross.searle@csiro.auXXXXXa')
         #   #print('cookieset')
         ck <- fetch_cookie(name=cookieName)
-        # print(ck$miSensorsAppInfo)
-        str(ck)
         RV$Init=F
         
         if(length(ck$miSensorsAppInfo)>0){
@@ -479,24 +484,24 @@ shiny::shinyApp(
         
         
         sql <- paste0("Select usr, pwd from appUsers where usr = '", RV$CurrentUser, "'")
+        df <- queryDB(sql)
+        print(paste0("query of db ", df))
+        # res <- dbSendQuery(con, sql)
+        # df <- dbFetch(res)
         
-        res <- dbSendQuery(con, sql)
-        df <- dbFetch(res)
+       # nrecs <- dbGetRowCount(res)
+      #  dbClearResult(res)
         
-        nrecs <- dbGetRowCount(res)
-        dbClearResult(res)
-        
-        if(nrecs > 0){
+        if(nrow(df) > 0){
           #Check against password
           
           dbusr <- df[1,1]
           hash <- df[1,2]
           
-          print(RV$pwd)
+
           
           if( identical(hash, digest(RV$pwd, serialize=T))){
             
-            print(hash)
             appAuth$loggedIn <- T
             appAuth$currentUsr <- RV$CurrentUser
             status(paste0('in as ', RV$CurrentUser))
@@ -609,14 +614,14 @@ shiny::shinyApp(
     observeEvent(input$login, {
       
       ck <- paste0(input$username,'XXXXX', input$password)
-      js$setcookie(ck)
+    
       print("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF")
     })
     
     observeEvent(input$logout, {
       appAuth$loggedIn <- F
       status('out')
-      js$rmcookie()
+      
     })
     
     output$textusrID <- renderText({
