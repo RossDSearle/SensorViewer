@@ -23,7 +23,7 @@ library(fullcalendar)
 library(leaflet.extras)
 library(rhandsontable)
 
-debugging = T
+debugging = F
 
 machineName <- as.character(Sys.info()['nodename'])
 print(machineName)
@@ -289,6 +289,9 @@ ui <- dashboardPage(
                 immediate = F
               ),
 
+              
+              materialSwitch(inputId = "prefExtendedSetButton", value = F, label = 'Show extended locations'),
+              
               actionBttn(
                 inputId = "prefSave",
                 label = "Save ",
@@ -376,6 +379,25 @@ server <- function(input, output, session) {
   d <- getURL(paste0(senFedPath,"getSensorLocations"))
   sensorLocs <- fromJSON(d)
   
+    observe({
+      
+      req(RV$prefExtendedSet)
+        print(RV$prefExtendedSet)
+        if(as.numeric(RV$prefExtendedSet)==1){
+          lurl <- paste0(senFedPath,"getSensorLocations?sensortype=", input$DataTypeDataDownload, "&extendedSet=T")
+        }else{
+          lurl <- paste0(senFedPath,"getSensorLocations?sensortype=", input$DataTypeDataDownload)
+        }
+        print(lurl)
+        d <- getURL(lurl)
+        sdf <- fromJSON(d)
+        print(tail(sdf))
+        
+        RV$sensorLocs <- sdf
+    })
+  
+  
+  
  
   RV <- reactiveValues()
   RV$SelectedSite <- NULL
@@ -384,6 +406,7 @@ server <- function(input, output, session) {
   RV$sensorLocsDownload <- NULL
   RV$pref_defSite <- NULL
   RV$pref_daysSince <- NULL
+  RV$prefExtendedSet <- NULL
   RV$error <- NULL
   RV$AppType <- NULL
   RV$CurrentSensorData <- NULL
@@ -637,9 +660,10 @@ server <- function(input, output, session) {
     
     if(!debugging){
     
-    d <- getURL(paste0(senFedPath,"getSensorLocations?sensortype=", input$DataTypeDataDownload))
-    sdf <- fromJSON(d)
-
+      lurl <- paste0(senFedPath,"getSensorLocations?sensortype=", input$DataTypeDataDownload)
+      d <- getURL(lurl)
+      sdf <- fromJSON(d)
+    
     RV$sensorLocsDownload <- sdf
     #sdf <- RV$sensorLocs
     
@@ -1157,7 +1181,7 @@ output$amchartCum <- renderAmCharts({
     dfs <- df[df$SiteID == click$id,  ]
 
     RV$SelectedSite <-  click$id
-
+p
 
     outdf <- data.frame(att= character(10), vals=character(10), stringsAsFactors = F)
     outdf[1,1] <- 'Site Name'
@@ -1169,9 +1193,9 @@ output$amchartCum <- renderAmCharts({
     outdf[4,1] <- 'Location'
     outdf[4,2] <- paste0('Lon = ', dfs$Longitude, '  Lat = ', dfs$Latitude)
     outdf[5,1] <- 'Access'
-    outdf[5,2] <- dfs$Access
+  #  outdf[5,2] <- dfs$Access
     outdf[6,1] <- 'Active'
-    outdf[6,2] <- as.character( dfs$Active )
+  #  outdf[6,2] <- as.character( dfs$Active )
     outdf[7,1] <- 'Provider'
     outdf[7,2] <- dfs$Backend
     outdf[8,1] <- 'Start Date'
@@ -1317,11 +1341,13 @@ output$amchartCum <- renderAmCharts({
     
     RV$pref_defSite <- prefs$defaultSite
     RV$pref_daysSince <- prefs$daysSince
+    RV$prefExtendedSet <- prefs$showExtended
     
     updateKnobInput(session = session,inputId = "prefDaysToExtract",value = RV$pref_daysSince)
     updateSelectInput(session = session, inputId = 'prefDefaultSite', choices = sns$localName, selected = RV$pref_defSite)
     updateSelectInput(session, 'pickSensor', choices = sns$localName, selected = RV$pref_defSite)
     updateSelectInput(session = session, inputId = 'mySensors', choices = sns$localName )
+    updateMaterialSwitch(session = session, 'prefExtendedSetButton', value = RV$prefExtendedSet)
   })
 
  #### Manage Sensors - Show sensor info   ######  
@@ -1376,18 +1402,20 @@ output$amchartCum <- renderAmCharts({
     
     defSite <- input$prefDefaultSite
     defDaysSince <- input$prefDaysToExtract
+    defextendedSet <- input$prefExtendedSetButton
     
     tryCatch({
       
       conUpdate <- dbConnect(RSQLite::SQLite(), dbPath, flags = SQLITE_RW)
-      rs <- dbSendStatement(conUpdate, "Update appUsers SET daysSince = :y, defaultSite = :z where  usr = :x")
-      dbBind(rs, param = list(x = str_to_lower(appAuth$currentUsr), y = defDaysSince, z = defSite))
+      rs <- dbSendStatement(conUpdate, "Update appUsers SET daysSince = :y, defaultSite = :z, showExtended = :w where  usr = :x")
+      dbBind(rs, param = list(x = str_to_lower(appAuth$currentUsr), y = defDaysSince, z = defSite, w = defextendedSet))
       dbGetRowsAffected(rs)
       #dbClearResult(rs)
       dbDisconnect(conUpdate)
       
       RV$pref_daysSince <- defDaysSince
       RV$RV$pref_defSite <- defSite
+      RV$RV$extendedSet <- defextendedSet
       
       shinyalert("All Good", "Your preferences were successfully saved", type = 'success')
     }
