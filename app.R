@@ -196,6 +196,7 @@ shiny::shinyApp(
                           choices = c('None'),
                           inline = F,
                           options = list(mobile = T)
+
                           
                         ),
                         pickerInput(
