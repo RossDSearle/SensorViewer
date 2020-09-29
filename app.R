@@ -1,5 +1,5 @@
 library(shiny)
-library(shinyMobile)
+
 library(shinyWidgets)
 library(leaflet)
 library(leaflet.extras)
@@ -8,7 +8,7 @@ library(httr)
 library(jsonlite)
 library(xts)
 library(shinybusy)
-library(shinyjs)
+
 library(rhandsontable)
 library(DBI)
 library(RSQLite)
@@ -30,7 +30,17 @@ library(rAmCharts)
 # library(leaflet.extras)
 # library(rhandsontable)
 
+library(shinyMobile)
+library(shinyjs)
 
+
+# get bootstrap dependency
+bsDep <- shiny::bootstrapLib()
+bsDep$name <- "bootstrap2"
+
+# get pickerInput dependency
+pkDep <- htmltools::findDependencies(shinyWidgets:::attachShinyWidgetsDep(tags$div(), widget = "picker"))
+pkDep[[2]]$name <- "picker2"
 
 
 
@@ -57,6 +67,7 @@ source('appUtils.R')
 source('appConfig.R')
 source("helpers.R")
 
+ismobile=T
 
 
 
@@ -70,27 +81,21 @@ myDownloadButton <- function(outputId, label = "Download"){
 }
 
 
-# jsCode <- '
-# shinyjs.getcookie = function(params) {
-# var cookie = Cookies.get("id");
-# if (typeof cookie !== "undefined") {
-# Shiny.onInputChange("jscookie", cookie);
-# } else {
-# var cookie = "";
-# Shiny.onInputChange("jscookie", cookie);
-# }
-# }
-# shinyjs.setcookie = function(params) {
-# Cookies.set("id", escape(params), { expires: 31536000});
-# Shiny.onInputChange("jscookie", params);
-# }
-# shinyjs.rmcookie = function(params) {
-# Cookies.remove("id");
-# Shiny.onInputChange("jscookie", "");}'
+
 
 
 shiny::shinyApp(
   ui = f7Page(
+    
+    
+    # Suppress dependencies
+    htmltools::suppressDependencies("selectPicker"),
+    htmltools::suppressDependencies("bootstrap"),
+    
+    # reinject them
+    bsDep, pkDep, 
+    
+    
     title = "miSensors",
     init = f7Init(skin = "auto", theme = "light", filled = T, color = 'lightblue'),
     tags$head(tags$link( rel="icon", type="image/png", href="wheat.png", sizes="32x32" ),
@@ -185,20 +190,19 @@ shiny::shinyApp(
                         
                         #fluidRow(column(1), column(11,selectInput("pickSensor", "Site Name", list(c('None'))))),
                         
-                        f7Picker(inputId = 'pickSensor', label = "Site Name",  choices =  c('None'), toolbar=T, openIn='auto',scrollToInput=T,toolbarCloseText = "Done",sheetSwipeToClose = TRUE),
-                        f7Picker(inputId = 'pickDataStreamType', label = "Sensor Type",  choices =  c('None'), toolbar=T, openIn='auto',scrollToInput=T,toolbarCloseText = "Done",sheetSwipeToClose = TRUE),
+                        # f7Picker(inputId = 'pickSensor', label = "Site Name",  choices =  c('None'), toolbar=T, openIn='auto',scrollToInput=T,toolbarCloseText = "Done",sheetSwipeToClose = TRUE),
+                        # f7Picker(inputId = 'pickDataStreamType', label = "Sensor Type",  choices =  c('None'), toolbar=T, openIn='auto',scrollToInput=T,toolbarCloseText = "Done",sheetSwipeToClose = TRUE),
                         pickerInput(
                           inputId = 'pickSensor',
                           label = "Location", 
                           choices = c('None'),
-                          options = list(mobile = T, inline=T, size = 0, width='50%')
-                          
+                          inline = F,
+                          options = list(mobile = T)
+
                           
                         ),
                         #selectInput("pickDataStreamType", "Sensor Type", list(c('None'))), 
-                        
-                        
-                        
+
                         amChartsOutput(outputId = "amchart"),
                         HTML('<BR>')
                       )
