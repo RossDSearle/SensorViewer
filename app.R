@@ -173,7 +173,7 @@ shiny::shinyApp(
       ),
       
       
-      ##################################  UI - SOIL MOISTURE PROBE MAP  ##################################         
+      ##################################  UI - Main Sensor viewing tab  ##################################         
       
       f7Tabs(
         animated = T,
@@ -187,23 +187,26 @@ shiny::shinyApp(
             hover = TRUE,
             tags$div( style=paste0("width: ", defWidth),
                       f7Card(
-                        
+                        title = "Choose Sensor",
                         #fluidRow(column(1), column(11,selectInput("pickSensor", "Site Name", list(c('None'))))),
                         
-                        # f7Picker(inputId = 'pickSensor', label = "Site Name",  choices =  c('None'), toolbar=T, openIn='auto',scrollToInput=T,toolbarCloseText = "Done",sheetSwipeToClose = TRUE),
-                        # f7Picker(inputId = 'pickDataStreamType', label = "Sensor Type",  choices =  c('None'), toolbar=T, openIn='auto',scrollToInput=T,toolbarCloseText = "Done",sheetSwipeToClose = TRUE),
                         pickerInput(
-                          inputId = 'pickSensor333333',
+                          inputId = 'pickSensor',
                           label = "Location", 
-                          choices = c('None','1','2'),
+                          choices = c('None'),
                           inline = F,
-                          options = list(mobile = F, size = 0, actionsBox=T, container='.main-body')
+                          options = list(mobile = T)
                           
                         ),
-                        #selectInput("pickDataStreamType", "Sensor Type", list(c('None'))), 
-
-                        amChartsOutput(outputId = "amchart"),
-                        HTML('<BR>')
+                        pickerInput(
+                          inputId = 'pickDataStreamType',
+                          label = "Sensor Type", 
+                          choices = c('None'),
+                          inline = F,
+                          options = list(mobile = T)
+                          
+                        ),
+                      
                       )
             )
           ), side = "left" ),
@@ -216,7 +219,7 @@ shiny::shinyApp(
                       f7Card(
                         title = "Current Soil Water Summary",
                         id = 'swgaugecard',
-                        
+                        amChartsOutput(outputId = "amchart"),
                         
                       ))), side = "left" ),
           
@@ -396,17 +399,19 @@ shiny::shinyApp(
     
     observe({
       
-      withBusyIndicatorServer("fetchSensorData", {
+      print("GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG")
+      
+    #  withBusyIndicatorServer("fetchSensorData", {
         
-        if(!debugging){
+       # if(!DEBUG){
           
           dtype <- input$pickDataStreamType
           locID <- input$pickSensor
           
-          if(has_internet()){
+         # if(has_internet()){
             if(dtype != 'None' & locID != 'None' & locID != ''  & dtype != ''){
               
-              tryCatch({
+            #  tryCatch({
                 
                 dnowYMD <- format(Sys.time(), "%Y-%m-%d")
                 isoEDate <- paste0(format(Sys.time(), "%Y-%m-%d"), 'T00:00:00')
@@ -416,11 +421,20 @@ shiny::shinyApp(
                 py <- edp - back
                 isoSDate <- str_replace_all(as.character(py), ' ', 'T')
                 
-                sensorID <- getSensorIDFromLocalName(con, appAuth$currentUsr, input$pickSensor)
+                sensorID <- getSensorIDFromLocalName(appAuth$currentUsr, input$pickSensor)
                 
-                url <- paste0(senFedPath, "getSensorDataStreams?siteid=", sensorID,"&sensortype=", dtype,"&startdate=", isoSDate, '&enddate=', isoEDate, "&aggperiod=days&usr=SensorViewer&pwd=UbB0f7jXKQBXahyfU7cjOcaZEHUZSpE19dmX")
+                #url <- paste0(senFedPath, "getSensorDataStreams?siteid=", sensorID,"&sensortype=", dtype,"&startdate=", isoSDate, '&enddate=', isoEDate, "&aggperiod=days&usr=SensorViewer&pwd=UbB0f7jXKQBXahyfU7cjOcaZEHUZSpE19dmX")
+                url <- paste0(senFedPath, "getSensorDataStreams?siteid=", sensorID,"&sensortype=", dtype,"&startdate=", '2020-09-01T00:00:00', '&enddate=', isoEDate, "&aggperiod=days&usr=SensorViewer&pwd=UbB0f7jXKQBXahyfU7cjOcaZEHUZSpE19dmX")
+                
                 print(url)
+                f7Toast(
+                  session = session,
+                  position = "top",
+                  text = "I am a toast. Eat me!"
+                )
+                
                 resp <- getURL(paste0(url))
+                print(resp)
                 if(responseIsOK(resp)){
                   ts <- convertJSONtoTS(resp)
                   if(is.null(colnames(ts))){
@@ -435,29 +449,49 @@ shiny::shinyApp(
                   stop(e$error)
                 }
                 
-              }, error = function(err) {
-                #shinyalert("Oops", err$message, type = 'error')
-                
-                RV$error <- 'It would appear there is no data to display for this sensor.'
-                
-                
-              },finally = {
-                
-              })
+              # }, error = function(err) {
+              #   #shinyalert("Oops", err$message, type = 'error')
+              #   
+              #   RV$error <- 'It would appear there is no data to display for this sensor.'
+              #   
+              #   
+              # },finally = {
+              #   
+              #   
+              # })
             }
-          }else{
-            
-            session$sendCustomMessage(type = 'errorMessage', message = paste0('There was a problem connecting to the internet'))
-            
-          }
-        }
-      })
+          # }else{
+          #   
+          #   session$sendCustomMessage(type = 'errorMessage', message = paste0('There was a problem connecting to the internet'))
+          #   
+          # }
+        #}
+     # })
       
       
     })
     
-    
-    
+#########   Draw Main chart   ###########    
+    output$amchart <- renderAmCharts({
+      
+      req(appData$currentTS)
+      
+      if(input$pickDataStreamType == 'Rainfall'){
+        
+        ts <- data.frame(DateTime= as.character(format(index(appData$currentTS), format="%d-%m-%Y")), coredata(appData$currentTS),row.names=NULL)
+        
+        colnames(ts) <- c('Date', 'Vals')
+        ts$Vals[ts$Vals == 0] <- NA
+        amBarplot(x = "Date", y = "Vals", data = ts, labelRotation = -45,show_values = TRUE, groups_color = c("#87cefa"))
+        
+      }else{
+        
+        ts <- data.frame(DateTime= as.character(index(appData$currentTS)), coredata(appData$currentTS),row.names=NULL)
+        #colnames(ts) <- c('Date', 'Vals')
+        ts$Date <- as.POSIXct(as.character(ts$Date))
+        amTimeSeries(data=ts, col_date = 'Date', col_series = colnames(ts)[-1], main = 'Daily Rainfall')
+      }
+    })   
     
     
     
@@ -502,7 +536,7 @@ shiny::shinyApp(
           # stnsJ <- fromJSON(stnsRaw)
           # sns <- unique(stnsJ$DataType)
           #updateSelectInput(session, "pickDataStreamType", choices =  sns, selected = DefaultSensor)
-          updateF7Picker( inputId = 'pickDataStreamType', choices = sns, value = sns[1] )
+       updatePickerInput(session = session, inputId = 'pickDataStreamType', choices = sns, selected = sns[1] )
        # }
       #}
     })
