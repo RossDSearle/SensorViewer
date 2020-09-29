@@ -189,9 +189,10 @@ shiny::shinyApp(
                         f7Picker(inputId = 'pickDataStreamType', label = "Sensor Type",  choices =  c('None'), toolbar=T, openIn='auto',scrollToInput=T,toolbarCloseText = "Done",sheetSwipeToClose = TRUE),
                         pickerInput(
                           inputId = 'pickSensor',
-                          label = "LOcation", 
+                          label = "Location", 
                           choices = c('None'),
-                          options = list('mobile' = TRUE, 'inline'=T, size = 5)
+                          options = list(mobile = T, inline=T, size = 0, width='50%')
+                          
                           
                         ),
                         #selectInput("pickDataStreamType", "Sensor Type", list(c('None'))), 
