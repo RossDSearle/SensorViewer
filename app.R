@@ -26,7 +26,7 @@ library(RCurl)
 # library(DT)
 library(plotly)
 library(rAmCharts)
-#library(fullcalendar)
+library(fullcalendar)
 # library(leaflet.extras)
 # library(rhandsontable)
 
@@ -173,7 +173,7 @@ shiny::shinyApp(
       ),
       
       
-      ##################################  UI - Main Sensor viewing tab  ##################################         
+      ##################################  UI - Main Sensor Viewing Tab  ##################################         
       
       f7Tabs(
         animated = T,
@@ -196,8 +196,6 @@ shiny::shinyApp(
                           choices = c('None'),
                           inline = F,
                           options = list(mobile = T)
-
-                          
                         ),
                         pickerInput(
                           inputId = 'pickDataStreamType',
@@ -218,23 +216,28 @@ shiny::shinyApp(
             hover = TRUE,
             tags$div( style=paste0("width: ", defWidth),
                       f7Card(
-                        title = "Current Soil Water Summary",
+                        title = NULL,
                         id = 'swgaugecard',
                         amChartsOutput(outputId = "amchart"),
                         
                       ))), side = "left" ),
           
-          f7Float(  f7Shadow(
-            intensity = 100,
-            hover = TRUE,
+          f7Float(  f7Shadow(intensity = 100, hover = TRUE,
             tags$div( style=paste0("width: ", defWidth),
                       f7Card(
-                        title = NULL,
-                        
-                        
+                        title = NULL, height = 200,
+                        #fullcalendarOutput("Cal", height = "500px"),
+                        #calendarOutput("Cal2")
                         
                       )
             )
+          ), side = "left" ),
+          f7Float(  f7Shadow(intensity = 100, hover = TRUE,
+                             tags$div( style=paste0("width: ", defWidth),
+                                       f7Card(
+                                         calendarOutput("Cal2",height='auto')
+                                       )
+                             )
           ), side = "left" ),
           
           f7Float( 
@@ -243,8 +246,8 @@ shiny::shinyApp(
               hover = TRUE,
               tags$div( style=paste0("width: ", defWidth),
                         f7Card(
-                          title = 'Soil Water Bucket',
-                          
+                          title = '',
+                          tableOutput('SensorValsTable')
                         )
               )
             ), side = "left" )
@@ -521,9 +524,57 @@ output$StreamTotMsg <- renderText({
         amTimeSeries(data=ts, col_date = 'Date', col_series = colnames(ts)[-1], main = 'Daily Rainfall')
       }
     })   
+
+#### View Sensors - Calendar  #####
+# output$Cal <- renderFullcalendar({
+#   
+#   ts <- data.frame(DateTime= as.character(index(appData$currentTS)), coredata(appData$currentTS),row.names=NULL)
+#   colnames(ts) <- c('Date', 'Vals')
+#   ts$Vals[ts$Vals == 0] <- NA
+#   ts <- na.omit(ts)
+#   bits <- str_split(as.character(ts$Date), ' ')
+#   dts <- sapply(bits, function (x) x[1])
+#   
+#   
+#   cdata = data.frame(title =ts$Vals,
+#                      start = dts,
+#                      end = dts,
+#                      color = c("blue"))
+#   fullcalendar(cdata, settings = list( contentHeight='600px'))
+# })    
     
-    
-    
+
+output$Cal2 <- renderCalendar({
+  
+  ts <- data.frame(DateTime= as.character(index(appData$currentTS)), coredata(appData$currentTS),row.names=NULL)
+  colnames(ts) <- c('Date', 'Vals')
+  ts$Vals[ts$Vals == 0] <- NA
+  ts <- na.omit(ts)
+  bits <- str_split(as.character(ts$Date), ' ')
+  dts <- sapply(bits, function (x) x[1])
+clr <- calendar(defaultView = "month", taskView = F, scheduleView = c("time", "allday"), useNav = TRUE, height = '200px', readOnly = T,useDetailPopup=F) %>%
+set_calendars_props(id = "Rainfall", name = "Rainfall", color = "#070808", bgColor = "#9DD2F7")
+df2 <- data.frame(calendarId = "Rainfall", title = as.character(coredata(appData$currentTS)),  start = as.Date(as.character(index(appData$currentTS))),   end = as.Date(as.character(index(appData$currentTS))), category = "allday")
+df3 <- df2[df2$title!='0',]
+add_schedule_df(clr, df3)
+
+})
+
+
+
+#### View Sensors - Table  #####
+
+output$SensorValsTable <- renderTable({
+  
+  
+  ts <- data.frame(DateTime= as.character(index(appData$currentTS)), coredata(appData$currentTS),row.names=NULL)
+  tso <-  ts[rev(order(as.Date(ts$Date))),]
+  fd <- format(as.Date(tso$Date), "%d-%m-%Y")
+  DF <- data.frame(Date=fd, tso[,-1])
+  colnames(DF) <- c('Date',colnames(appData$currentTS))
+  DF
+}, digits = 1)
+
     
 ######   Update pick lists   ###########    
     
