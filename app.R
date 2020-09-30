@@ -592,7 +592,7 @@ output$StreamTotMsg <- renderText({
       #### Grab a cookie if present to populate authentication
       
 
-        r<-remove_cookie('miSensorsAppInfo')
+        #r<-remove_cookie('miSensorsAppInfo')
 
         add_cookie(name=cookieName, value='ross.searle@csiro.auXXXXXa')
         #   #print('cookieset')
