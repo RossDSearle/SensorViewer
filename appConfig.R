@@ -22,3 +22,7 @@ if(DEBUG){
     defUsr<- ''
     defPwd <- ''
 }
+
+
+errorDuration <- 10000
+errorPos <- "center"

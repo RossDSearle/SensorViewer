@@ -112,7 +112,7 @@ shiny::shinyApp(
     
     #add_busy_bar(color = "#FF0000", centered = FALSE, height = "18px"),
     #add_busy_spinner(spin = "fading-circle"),
-    #  add_busy_spinner(spin = "flower", margins = c(0, 0), position='full-page', color = 'red',height = "80px", width = "80px"),
+    add_busy_spinner(spin = "flower", margins = c(0, 0), position='full-page', color = 'red',height = "80px", width = "80px"),
     
     #title = NULL,
     preloader = F,
@@ -378,11 +378,10 @@ shiny::shinyApp(
     session$allowReconnect(TRUE)
     
     
-    d <- getURL(paste0(senFedPath,"getSensorLocations"))
-    sensorLocs <- fromJSON(d)
+   
     RV <- reactiveValues()
     RV$SelectedSite <- NULL
-    RV$sensorLocs <- sensorLocs
+    RV$sensorLocs <- NULL
     RV$sensorLocsDownload <- NULL
     RV$pref_defSite <- NULL
     RV$pref_daysSince <- NULL
@@ -391,8 +390,17 @@ shiny::shinyApp(
     RV$CurrentSensorData <- NULL
     RV$Init <- T
     
-    
-    
+#####  Show error messages ##########    
+    observe({
+      
+      req(RV$error)
+      f7Toast(
+        session = session,
+        position = errorPos,
+        text = RV$error,
+        closeTimeout = errorDuration,
+      )
+    })
     
     
     
@@ -400,9 +408,7 @@ shiny::shinyApp(
     
     observe({
       
-      print("GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG")
-      
-    #  withBusyIndicatorServer("fetchSensorData", {
+      withBusyIndicatorServer("fetchSensorData", {
         
        # if(!DEBUG){
           
@@ -428,11 +434,7 @@ shiny::shinyApp(
                 url <- paste0(senFedPath, "getSensorDataStreams?siteid=", sensorID,"&sensortype=", dtype,"&startdate=", '2020-09-01T00:00:00', '&enddate=', isoEDate, "&aggperiod=days&usr=SensorViewer&pwd=UbB0f7jXKQBXahyfU7cjOcaZEHUZSpE19dmX")
                 
                 print(url)
-                f7Toast(
-                  session = session,
-                  position = "top",
-                  text = "I am a toast. Eat me!"
-                )
+                
                 
                 resp <- getURL(paste0(url))
                 print(resp)
@@ -467,9 +469,35 @@ shiny::shinyApp(
           #   
           # }
         #}
-     # })
+      })
       
       
+    })
+    
+    
+    
+output$StreamTotMsg <- renderText({
+      
+      req(appData$currentTS)
+      
+      if(input$pickDataStreamType == 'Rainfall'){
+        
+        bck <- RV$pref_daysSince
+        sdt <- format(Sys.Date()-bck,  "%A %B %d %Y")
+        
+        paste0('<b>&nbsp;&nbsp;&nbsp;Rainfall since ', sdt, ' is <font color="blue">', sum(coredata(appData$currentTS)), '</font> mm</b>')
+        # ts <- data.frame(DateTime= as.character(index(appData$currentTS)), theVals=coredata(appData$currentTS),row.names=NULL)
+        # print(head(ts))
+        # rtot <- cumsum(ts$Rainfall)
+        # print(head(rtot))
+        # dfs <- data.frame(DateTime=as.POSIXct( ts$DateTime), theVals=as.numeric(rtot))
+        # # print(colnames(dfs))
+        # amTimeSeries(data=dfs, col_date = 'DateTime', col_series = colnames(dfs)[-1], maxSeries=100, main = 'Cummulative Rainfall')
+        
+      }else{
+        
+        NULL
+      }
     })
     
 #########   Draw Main chart   ###########    
@@ -514,29 +542,13 @@ shiny::shinyApp(
     observe({
      
       req(input$pickSensor,appAuth$loggedIn)
-     # print('KKKKKKKKKKKKKKKKKKKKKKKK')
       sensorID <- getSensorIDFromLocalName(appAuth$currentUsr, input$pickSensor)
 
       url <- paste0(senFedPath,'getSensorInfo?siteid=', sensorID)
       print(url)
       stnsJ <- getWebDataDF(url)
+      sns <- unique(stnsJ$DataType)
 
-      # stnsRaw <- getURL(paste0(url))
-      # stnsJ <- fromJSON(stnsRaw)
-       sns <- unique(stnsJ$DataType)
-       #print(sns)
-
-      #if(debugging){
-        
-        #if(appAuth$loggedIn){
-          
-          # req(input$pickSensor)
-          # sensorID <- getSensorIDFronLocalName(con, appAuth$currentUsr, input$pickSensor)
-          # url <- paste0(senFedPath,'getSensorInfo?siteid=', sensorID)
-          # stnsRaw <- getURL(paste0(url))
-          # stnsJ <- fromJSON(stnsRaw)
-          # sns <- unique(stnsJ$DataType)
-          #updateSelectInput(session, "pickDataStreamType", choices =  sns, selected = DefaultSensor)
        updatePickerInput(session = session, inputId = 'pickDataStreamType', choices = sns, selected = sns[1] )
        # }
       #}
@@ -560,11 +572,25 @@ shiny::shinyApp(
     
     
     
-    # check if a cookie is present 
+####  Intitialisation of the App ###########
+    
     observe({
       
-      
       if(RV$Init){
+        
+     #######   get the sensor locations
+      url <- paste0(senFedPath,"getSensorLocations")
+      r <- getWebData(url)
+      if(r$Error){
+        RV$error <- r$Message
+        return()
+      }else{
+        sensorLocs <- fromJSON(r$Response)
+        RV$sensorLocs <- sensorLocs
+      }
+      
+      #### Grab a cookie if present to populate authentication
+      
 
         r<-remove_cookie('miSensorsAppInfo')
 
